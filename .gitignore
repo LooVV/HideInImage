@@ -2,4 +2,7 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/HideInImage/x64/Debug
+
+/src/x64/Debug
+/src/HideInImage.vcxproj.filters
+*VC*
