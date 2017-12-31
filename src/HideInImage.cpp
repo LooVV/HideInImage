@@ -1,6 +1,21 @@
 #include "HideInImage.h"
 #pragma comment(lib,"gdiplus.lib")
 
+using namespace Gdiplus;
+
+ULONG_PTR SetupGdi()
+{
+	GdiplusStartupInput gdiplusStartupInput;
+	ULONG_PTR gdiplusToken;
+	GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+	return gdiplusToken;
+}
+
+VOID GdiShutdown(ULONG_PTR gdiplusToken)
+{
+	GdiplusShutdown(gdiplusToken);
+}
+
 static int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 {
 	UINT  num = 0;          // number of image encoders
@@ -36,9 +51,9 @@ int Encode(const WCHAR* InFilename, const WCHAR* OutFilename, const  char* Data,
 {
 	Bitmap   bitmap{ InFilename };
 
-	if (GetLastError() != Ok)
+	if ( GetLastError() )
 	{
-		return 4;
+		return CannotCreateFile;
 	}
 
 	int res = Encode(bitmap, Data, BytesToEncode, Offset);
@@ -60,7 +75,7 @@ int Encode(Bitmap& bitmap, const char* Data, UINT BytesToEncode, UINT Offset )
 
 	//not enough space
 	if ((Offset + BytesToEncode) * 8 > height * widht)
-		return 1;
+		return NotEnoughSpace;
 
 
 	UINT CurByte = 0;
@@ -105,9 +120,9 @@ int Encode(Bitmap& bitmap, const char* Data, UINT BytesToEncode, UINT Offset )
 	}
 
 	if (CurByte == BytesToEncode)
-		return 0;
+		return ok;
 	else
-		return 2;
+		return NotEnoughSpaceWrited;
 }
 
 int Decode(Bitmap& bitmap,  char* Data, UINT BytesToEncode, UINT Offset )
@@ -117,7 +132,7 @@ int Decode(Bitmap& bitmap,  char* Data, UINT BytesToEncode, UINT Offset )
 
 	//change to false 
 	if ((BytesToEncode + Offset) * 8 > height * widht)
-		return 1;
+		return NotEnoughSpace;
 
 	//filling 0
 	for (size_t i = 0; i < BytesToEncode; ++i)
@@ -130,7 +145,6 @@ int Decode(Bitmap& bitmap,  char* Data, UINT BytesToEncode, UINT Offset )
 	Status res;
 
 	//TODO: rewrite loop
-	//(!Offset ? 1 : Offset) to prevent / by 0
 	for (UINT CurRow = (!Offset ? 1 : Offset) / widht; CurRow < height; ++CurRow)
 	{
 		for (UINT CurCol = Offset % widht; CurCol < widht && CurByte < BytesToEncode; ++CurCol)
@@ -158,9 +172,9 @@ int Decode(Bitmap& bitmap,  char* Data, UINT BytesToEncode, UINT Offset )
 		}
 	}
 	if (CurByte == BytesToEncode)
-		return 0;
+		return ok;
 	else
-		return 2;
+		return NotEnoughSpaceWrited;
 }
 
 
@@ -169,7 +183,7 @@ int Decode(const WCHAR* Filename,  char* Data, UINT BytesToEncode, UINT Offset )
 	Bitmap   bitmap{ Filename };
 
 	if (GetLastError() != Ok)
-		return 3;
+		return CannotOpenFile;
 
 	return Decode(bitmap, Data, BytesToEncode, Offset);
 }
