@@ -1,28 +1,42 @@
 #pragma once
-#include <windows.h>
-#include <gdiplus.h>
 
+struct png_struct_def;
+struct png_info_def;
 
-enum ReturnValues {
-	ok = 0,
-	NotEnoughSpace,
-	NotEnoughSpaceWrited,
-	CannotOpenFile,
-	CannotCreateFile
+enum errors
+{
+	NO_ERROR,
+	ERROR_CANNOT_OPEN,
+	ERROR_NOT_PNG,
+	ERROR_INTERNAL,
+	ERROR_BAD_ALLOC
 };
 
-//TODO: write initializer
-//Need initialize GDI+ before using
-//setup gdi, call this before using Encode or decode
-ULONG_PTR SetupGdi();
-//Gdi shutdown, call this after using functions
-VOID GdiShutdown(ULONG_PTR gdiplusToken);
+struct image
+{
+	png_struct_def* image;
+	png_info_def* 	info_begin;
+	png_info_def* 	info_end;
+	unsigned char** 	bytes;
+	unsigned int 		height;
+	unsigned int 		width;
+};
 
-int Encode(Gdiplus::Bitmap& bitmap, const  char* Data, UINT BytesToEncode, UINT Offset = 0);
-//make bitmap and pass it to functions above
 
-int Encode(const WCHAR* const InFilename, const WCHAR* OutFilename, const  char* Data, UINT BytesToEncode, UINT Offset = 0);
+int load_form_file(image* img, const char *filename);
+int load_form_stream(image* img, FILE* fp);
 
-//Decode
-int Decode(Gdiplus::Bitmap& bitmap,  char* Data, UINT BytesToEncode, UINT Offset = 0);
-int Decode(const WCHAR* const  Filename,  char* Data, UINT BytesToEncode, UINT Offset = 0);
+
+void release_image(image* img);
+
+
+
+int write_to_stream( image* img, FILE* fp );
+int write_to_file(image* img, const char *filename); 
+
+int insert_data(image* img, const unsigned char* data, size_t data_size, size_t Offset);
+int retrieve_data(const image* img, unsigned char* data, size_t bytes_retrieve, size_t Offset);
+
+
+
+
