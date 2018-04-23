@@ -2,12 +2,6 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
+*bin
+*build
 
-/src/x64/Debug
-/src/HideInImage.vcxproj.filters
-*.VC.db
-*.VC.VC.opendb
-*.sln
-/.vs/HideInImage
-/src/.vs/HideInImage/v15
-/src/Debug
