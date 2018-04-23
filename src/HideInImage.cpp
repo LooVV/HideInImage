@@ -1,8 +1,7 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <vector>
-
-#include <png.h>
 
 #include "HideInImage.h"
 
@@ -15,13 +14,10 @@ static void get_rgba_repr(png_structp png, png_infop info)
 	png_byte color_type = png_get_color_type(png, info);
 	png_byte bit_depth  = png_get_bit_depth(png, info);
 
-	// Read any color_type into 8bit depth, RGBA format.
-	// See http://www.libpng.org/pub/png/libpng-manual.txt
 
 	if(bit_depth == 16)
 		png_set_strip_16(png);
 
-	// decode to rgb
 	if(color_type == PNG_COLOR_TYPE_PALETTE)
 		png_set_palette_to_rgb(png);
 
@@ -141,20 +137,22 @@ void release_image(image* img)
 	img->width 	= 0;
 }
 
-int write_to_file(image* img, const char *filename) 
+int save_to_file(image* img, const char *filename) 
 {
 
 	FILE *fp = fopen(filename, "wb");
 	if(!fp) 
 		return ERROR_CANNOT_OPEN;
 
-	int err = write_to_stream(img, fp);
+	int err = save_to_stream(img, fp);
 	fclose(fp);
 
 	return err;
 }
 
-int write_to_stream( image* img, FILE* fp )
+
+
+int save_to_stream( image* img, FILE* fp )
 {
 	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (!png) 
@@ -199,119 +197,92 @@ int write_to_stream( image* img, FILE* fp )
 }
 
 
-int insert_data(image* img, const unsigned char* data, size_t data_size, size_t Offset)
+int insert_data(image* img, const unsigned char* data, size_t data_size, 
+				size_t offset, unsigned int channel)
 {
 	//not enough space
-	if ((data_size) * 8 > img->height * img->width)
+	if ( data_size  * 8 > img->height * img->width + offset	)
+		return ERROR_NOT_ENOUGH_PIXELS;
+
+	unsigned int cur_byte = 0;
+	unsigned int  cur_bit = 7;
+
+	bool first_in_loop = true;
+	for (unsigned int cur_row = (!offset ? 1 : offset) / img->width; cur_row < img->height; ++cur_row)
 	{
-		printf("Not capacity\n");
-		return 2;
-	}
-
-	unsigned int CurByte = 0;
-	unsigned int  CurBit = 7;
-
-	//TODO: rewrite loop 
-	//control by bits and bytes
-	for (unsigned int CurRow = (!Offset ? 1 : Offset) / img->width; CurRow < img->height; ++CurRow)
-	{//not enough space
-		png_bytep row = img->bytes[CurRow];
-		for (unsigned int CurCol = Offset % img->width; CurCol < img->width && CurByte < data_size; ++CurCol)
+		png_bytep row = img->bytes[cur_row];
+		for (unsigned int cur_col = (first_in_loop ? offset % img->width : 0);
+					 cur_col < img->width && cur_byte < data_size; ++cur_col)
 		{
-		//getting color
-			png_bytep px = &(row[CurCol * 4]);
-      // Do something awesome for each pixel here...
-      //printf("%4d, %4d = RGBA(%3d, %3d, %3d, %3d)\n", x, y, px[0], px[1], px[2], px[3]);
+			//getting color
+			png_bytep px = &(row[cur_col * 4]);
 
-      //bitmap may have unused space
-      //TODO: find better solution for this
-      
+			//getting the pixel value
+			unsigned char r = px[channel];
 
-      // transparent pixels
+			//set last bit to 0
+			r = r >> 1 << 1;
+			//setting bit
+			r |= (data[cur_byte] >> cur_bit) & 1;
 
-      if (px[3] == 0)
-      {
-        continue;
-      }
+			//setting new value
+			px[channel] = r;
 
-      //WRITE TO R
-      unsigned char r = px[0];
-
-      //getting the pixel value
-      //set last bit to 0
-      r = r >> 1 << 1;
-      //setting bit
-      r |= (data[CurByte] >> CurBit) & 1;
-
-      //setting new value
-      px[0] = r;
-
-      //next bit
-      if (CurBit == 0)
-      {
-        CurBit = 7;
-        ++CurByte;
-      }
-      else {
-        --CurBit;
-      }
-    }
-  }
-
-  if (CurByte == data_size)
-    return 0;
-  else
-    return 1;
+			//next bit
+			if (cur_bit == 0)
+			{
+				cur_bit = 7;
+				++cur_byte;
+			}
+			else 
+				--cur_bit;
+		}
+		first_in_loop = false;
+	}
+	return NO_ERROR;
 }
 
-int retrieve_data(const image* img, unsigned char* data, size_t bytes_retrieve, size_t Offset)
+int retrieve_data(const image* img, unsigned char* data, size_t bytes_retrieve,
+					size_t offset, unsigned int channel)
 {
+  	//change to false 
+	if ( bytes_retrieve * 8 > img->height * img->width + offset)
+		return ERROR_NOT_ENOUGH_PIXELS;
 
-  //change to false 
-  if ((bytes_retrieve + Offset) * 8 > img->height * img->width)
-    return 2;
 
-  //filling 0
-  for (size_t i = 0; i < bytes_retrieve; ++i)
-    data[i] = 0;
+	// fill all zero
+	memset(data,0,bytes_retrieve);	
 
-  unsigned int CurByte = 0;
-  unsigned int CurBit = 7;
+	unsigned int cur_byte = 0;
+	unsigned int cur_bit = 7;
 
   
-  //TODO: rewrite loop
-  for (unsigned int CurRow = (!Offset ? 1 : Offset) / img->width; CurRow < img->height; ++CurRow)
-  {
-    png_bytep row = img->bytes[CurRow];
-    for (unsigned int CurCol = Offset % img->width; CurCol < img->width && CurByte < bytes_retrieve; ++CurCol)
-    {
-      //getting color
-      png_bytep px = &(row[CurCol * 4]);
+	bool first_in_loop = true;
+	for (unsigned int cur_row = (!offset ? 1 : offset) / img->width; cur_row < img->height; ++cur_row)
+	{
+		png_bytep row = img->bytes[cur_row];
+		for (unsigned int cur_col = (first_in_loop ? offset % img->width : 0);
+					 cur_col < img->width && cur_byte < bytes_retrieve; ++cur_col)
+		{
+			//getting color
+			png_bytep px = &(row[cur_col * 4]);
 
-      //unused space
-      if (px[3] == 0)
-      {
-        continue;
-      }
+			//getting the pixel value
+			unsigned char value = px[channel];
+			//setting current bit
+			data[cur_byte] |= (value & 1) << cur_bit;
 
-      //getting the pixel value
-      unsigned char value = px[0];
-      //setting current bit
-      data[CurByte] |= (value & 1) << CurBit;
+			//next bit
+			if (cur_bit == 0)
+			{
+				cur_bit = 7;
+				++cur_byte;
+			}
+			else 
+				--cur_bit;
+		}
+		first_in_loop = false;
+	}
 
-      //next bit
-      if (CurBit == 0)
-      {
-        CurBit = 7;
-        ++CurByte;
-      }
-      else {
-        --CurBit;
-      }
-    }
-  }
-  if (CurByte == bytes_retrieve)
-    return 0;
-  else
-    return 1;
+	return NO_ERROR;
 }
