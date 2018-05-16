@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h> 
 #include <ctype.h>
+#include <string>
 
 #include "HideInImage.h"
 
@@ -130,7 +131,7 @@ int main(int argc, char* argv[])
 
 	
 		// TODO: generate name differently
-		err = save_to_file( &img, "outimg.png" ); 
+		err = save_to_file(&img, (std::string("changed_") + image_file).c_str());
 		if( err ){
 			printf("Saving error %s\n",err_desc[err] );
 			return 1;
