@@ -16,4 +16,4 @@ jobs:
     - name: make
       run: make
     - name: test
-      run: bin/hide_in_image tests/pngs/burro.png load HideInImage/src/main.cpp 0 R
+      run: bin/hide_in_image tests/pngs/burro.png load src/main.cpp 0 R
